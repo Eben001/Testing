@@ -10,6 +10,7 @@ from aiohttp import ClientSession
 import os
 from fake_useragent import UserAgent
 from telegram import Bot
+ua = UserAgent()
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
