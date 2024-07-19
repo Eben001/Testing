@@ -11,7 +11,7 @@ env:
   telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 jobs:
-  test_server_ip:     
+  python_test:     
     runs-on: ubuntu-latest
 
     steps:
