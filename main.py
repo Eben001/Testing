@@ -321,15 +321,6 @@ async def get_start_urls(session, url):
   counties_links = []
   retry_attempts = 20
   for attempt in range(retry_attempts):
-
-    proxies = 'http://vk4ybm4f7ps5a54-odds-5+100:teys8oi11uhte8f@rp.proxyscrape.com:6060'
-    cookies = {
-    'usprivacy': '1N--',
-    '_ga_PHJMBM9BQV': 'GS1.1.1721344369.6.1.1721344749.42.0.0',
-    '_ga': 'GA1.1.97208457.1721307241',
-    '_fbp': 'fb.1.1721307248354.736019126636307686',
-}
-
     headers = {
     'User-Agent': ua.random,
     'Accept': '*/*',
@@ -345,37 +336,40 @@ async def get_start_urls(session, url):
     'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"',
 
 }
-
-    response = await session.get(url, proxy=proxies,headers=headers)
-    if response.status == 200:
-      soup = BeautifulSoup(await response.text(), 'lxml')
-      try:
-        ol = soup.find('ol', class_='counties')
-        all_counties = ol.find_all('h3')
-        for county in all_counties[0:1]: #0:26
-          county_link = county.find('a')['href']
-          # print(county_link)
-          counties_links.append(county_link)
-
-        return counties_links
-      except:
-        pass
-    elif str(response.status).startswith('4') and response.status != 404:
-      print(f"4xx error encountered: {response.status}. Retrying...")
-      #async with aiohttp.ClientSession() as new_session:
-        #session = new_session  # Replace the session with a new on
-      sleep_time = attempt * 2
-      print(f"Retrying in {sleep_time} seconds...")
-      await asyncio.sleep(sleep_time)
-        #continue
-    elif str(response.status).startswith('5'):
-      print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
-      sleep_time = attempt * 2
-      print(f"Retrying in {sleep_time} seconds...")
-      await asyncio.sleep(sleep_time)
-    else:
+    try:
+      response = await session.get(url, proxy=proxies,headers=headers)
+      if response.status == 200:
+        soup = BeautifulSoup(await response.text(), 'lxml')
+        try:
+          ol = soup.find('ol', class_='counties')
+          all_counties = ol.find_all('h3')
+          for county in all_counties[0:1]: #0:26
+            county_link = county.find('a')['href']
+            # print(county_link)
+            counties_links.append(county_link)
+  
+          return counties_links
+        except:
+          pass
+      elif str(response.status).startswith('4') and response.status != 404:
+        print(f"4xx error encountered: {response.status}. Retrying...")
+        #async with aiohttp.ClientSession() as new_session:
+          #session = new_session  # Replace the session with a new on
+        sleep_time = attempt * 2
+        print(f"Retrying in {sleep_time} seconds...")
+        await asyncio.sleep(sleep_time)
+          #continue
+      elif str(response.status).startswith('5'):
+        print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
+        sleep_time = attempt * 2
+        print(f"Retrying in {sleep_time} seconds...")
+        await asyncio.sleep(sleep_time)
+      else:
+        print(f"Unexpected error encountered: {response.status}. Retrying...")
+   except: 
       print(f"Unexpected error encountered: {response.status}. Retrying...")
- 
+
+     
 
 async def main():
     BATCH_SIZE = 10  # Define your batch size
