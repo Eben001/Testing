@@ -64,14 +64,14 @@ async def get_profile_details_with_retry(session, url):
         return response
       elif str(response.status).startswith('4') and response.status != 404:
         print(f"4xx error encountered: {response.status}. Retrying...")
-        async with aiohttp.ClientSession() as new_session:
+        async with aiohttp.ClientSession(trust_env=True) as new_session:
           session = new_session  # Replace the session with a new on
           sleep_time = attempt * 2
           print(f"Retrying in {sleep_time} seconds...")
           await asyncio.sleep(sleep_time)
 
       elif str(response.status).startswith('5'):
-        async with aiohttp.ClientSession() as new_session:
+        async with aiohttp.ClientSession(trust_env=True) as new_session:
           session = new_session  # Replace the session with a new on
           sleep_time = attempt * 2
           print(f"Retrying in {sleep_time} seconds...")
@@ -251,7 +251,7 @@ async def get_last_page(session, url):
           pass
       elif str(response.status).startswith('4') and response.status != 404:
         print(f"4xx error encountered: {response.status}. Retrying...")
-        #async with aiohttp.ClientSession() as new_session:
+        #async with aiohttp.ClientSession(trust_env=True) as new_session:
           #session = new_session  # Replace the session with a new on
         sleep_time = attempt * 2
         print(f"Retrying in {sleep_time} seconds...")
@@ -372,7 +372,7 @@ async def main():
     BATCH_SIZE = 10  # Define your batch size
 
     try:
-        async with ClientSession() as session:
+        async with ClientSession(trust_env=True) as session:
             state_url = 'https://bustednewspaper.com/mugshots/ohio/'
             state = state_url.split('/')[-2]
             await send_telegram_message(f'Started {state}')
