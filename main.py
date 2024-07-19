@@ -38,53 +38,52 @@ async def send_telegram_message(text):
 
 
 
+
 profile_list = []
-async def get_profile_details_with_retry(session, url):
+async def fetch_with_retry(session, url, headers, semaphore, max_retries=20):
+    retry_count = 0
+    backoff_factor = 2
+    while retry_count < max_retries:
+        try:
+            async with semaphore:
+                response = await session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=60),
+                                             proxy=proxies)
+            if response.status == 200:
+                return response
+            elif response.status >= 400 and response.status < 500:
+                print(f"4xx error encountered: {response.status}. Retrying...")
+            elif response.status >= 500:
+                print(f"5xx error encountered: {response.status}. Retrying...")
+        except (aiohttp.ClientOSError, aiohttp.ServerDisconnectedError) as e:
+            print(f"Network error encountered: {e}. Retrying...")
+        except Exception as e:
+            print(f"Unexpected error encountered: {e}. Retrying...")
 
-  retry_attempts = 20
-  for attempt in range(retry_attempts):
-      headers = {
-    'User-Agent': ua.random,
-    'Accept': '*/*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Sec-Purpose': 'prefetch',
-    'Connection': 'keep-alive',
-    'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-    'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'same-origin',
-    'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'}
-
-
-      response = await session.get(url, proxy=proxies,headers=headers)
-      if response.status == 200:
-        # print('Got it: ', response.status)
-        return response
-      elif str(response.status).startswith('4') and response.status != 404:
-        print(f"4xx error encountered: {response.status}. Retrying...")
-        async with aiohttp.ClientSession(trust_env=True) as new_session:
-          session = new_session  # Replace the session with a new on
-          sleep_time = attempt * 2
-          print(f"Retrying in {sleep_time} seconds...")
-          await asyncio.sleep(sleep_time)
-
-      elif str(response.status).startswith('5'):
-        async with aiohttp.ClientSession(trust_env=True) as new_session:
-          session = new_session  # Replace the session with a new on
-          sleep_time = attempt * 2
-          print(f"Retrying in {sleep_time} seconds...")
-          await asyncio.sleep(sleep_time)
-
-      else:
-        print(f"Unexpected error encountered: {response.status}. Retrying...")
+        retry_count += 1
+        sleep_time = backoff_factor ** retry_count + random.uniform(0, 1)
+        print(f"Retrying in {sleep_time} seconds...")
+        await asyncio.sleep(sleep_time)
+    return None
 
 
-
-async def get_profile_details(session, booking_url):
-    response = await get_profile_details_with_retry(session, booking_url)
-
+async def get_profile_details(session, booking_url, semaphore):
+    headers = {
+        'User-Agent': ua.random,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Purpose': 'prefetch',
+        'Connection': 'keep-alive',
+        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+    }
+    response = await fetch_with_retry(session, booking_url, headers, semaphore)
+    if response is None:
+        return
 
     soup = BeautifulSoup(await response.text(), 'lxml')
     data = None
@@ -213,181 +212,80 @@ async def get_profile_details(session, booking_url):
     profile_list.append(profile)
 
 
-async def get_last_page(session, url):
-  # url = 'https://bustednewspaper.com/mugshots/florida/alachua-county/'
- 
-  retry_attempts= 20
-  for attempt in range(retry_attempts):
+async def get_last_page(session, url, semaphore):
     headers = {
-    'User-Agent': ua.random,
-    'Accept': '*/*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Sec-Purpose': 'prefetch',
-    'Connection': 'keep-alive',
-    'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-    'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'same-origin',
-    'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"',}
+        'User-Agent': ua.random,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Purpose': 'prefetch',
+        'Connection': 'keep-alive',
+        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+    }
+    response = await fetch_with_retry(session, url, headers, semaphore)
+    if not response:
+        return
+
+    soup = BeautifulSoup(await response.text(), 'lxml')
+    max_page = 0
+    for page in soup.find_all('a', class_='page-numbers'):
+        page_num = int(re.search(r'page/(\d+)/', page['href']).group(1))
+        if page_num > max_page:
+            max_page = page_num
+    return max_page
 
 
-    try:
-      response = await session.get(url, proxy=proxies,headers=headers)
-      if response.status == 200:
-        # print('Got it: ', response.status)
-        soup = BeautifulSoup(await response.text(), 'lxml')
-        try:
-          page_numbers = soup.find_all('a', class_='page-numbers')
-          max_page = 0
-          for page in page_numbers:
-              page_num = int(re.search(r'page/(\d+)/', page['href']).group(1))
-              if page_num > max_page:
-                  max_page = page_num
-
-          return max_page
-        except:
-          pass
-      elif str(response.status).startswith('4') and response.status != 404:
-        print(f"4xx error encountered: {response.status}. Retrying...")
-        #async with aiohttp.ClientSession(trust_env=True) as new_session:
-          #session = new_session  # Replace the session with a new on
-        sleep_time = attempt * 2
-        print(f"Retrying in {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
-          #continue
-      elif str(response.status).startswith('5'):
-        print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
-        sleep_time = attempt * 2
-        print(f"Retrying in {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
-      else:
-        print(f"Unexpected error encountered: {response.status}. Retrying...")
-    except:
-      print("Error, retrying....")
-      pass
-
-
-
-
-async def get_pages_with_retry(session, url):
-  retry_attempts = 20
-  for attempt in range(retry_attempts):
- 
+async def get_start_urls(session, url, semaphore):
     headers = {
-    'User-Agent': ua.random,
-    'Accept': '*/*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Sec-Purpose': 'prefetch',
-    'Connection': 'keep-alive',
-    'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-    'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'same-origin',
-    'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"',
+        'User-Agent': ua.random,
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Purpose': 'prefetch',
+        'Connection': 'keep-alive',
+        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+    }
+    response = await fetch_with_retry(session, url, headers, semaphore)
+    if not response:
+        return []
 
-}
-    try:
-      response = await session.get(url, proxy=proxies,headers=headers)
-      if response.status == 200:
-        print('Got it: ', response.status)
-        return response
-      elif str(response.status).startswith('4') and response.status != 404:
-        print(f"4xx error encountered: {response.status}. Retrying...")
-        #async with aiohttp.ClientSession() as new_session:
-         # session = new_session  # Replace the session with a new on
-        sleep_time = attempt * 2
-        print(f"Retrying in {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
-          #continue
-      elif str(response.status).startswith('5'):
-        print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
-        sleep_time = attempt * 2
-        print(f"Retrying in {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
-      else:
-        print(f"Unexpected error encountered: {response.status}. Retrying...")
-    except:
-      print("Error, retrying....")
-      pass
-
-async def get_start_urls(session, url):
-  counties_links = []
-  retry_attempts = 20
-  for attempt in range(retry_attempts):
-    headers = {
-    'User-Agent': ua.random,
-    'Accept': '*/*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Sec-Purpose': 'prefetch',
-    'Connection': 'keep-alive',
-    'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-    'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'no-cors',
-    'Sec-Fetch-Site': 'same-origin',
-    'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"',
-  
-  }
-  try:
-    response = await session.get(url, proxy=proxies,headers=headers)
-    if response.status == 200:
-      soup = BeautifulSoup(await response.text(), 'lxml')
-      try:
-        ol = soup.find('ol', class_='counties')
-        all_counties = ol.find_all('h3')
-        for county in all_counties[0:20]: 
-          county_link = county.find('a')['href']
-          # print(county_link)
-          counties_links.append(county_link)
-  
-        return counties_links
-      except:
-        pass
-    elif str(response.status).startswith('4') and response.status != 404:
-      print(f"4xx error encountered: {response.status}. Retrying...")
-      #async with aiohttp.ClientSession() as new_session:
-        #session = new_session  # Replace the session with a new on
-      sleep_time = attempt * 2
-      print(f"Retrying in {sleep_time} seconds...")
-      await asyncio.sleep(sleep_time)
-        #continue
-    elif str(response.status).startswith('5'):
-      print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
-      sleep_time = attempt * 2
-      print(f"Retrying in {sleep_time} seconds...")
-      await asyncio.sleep(sleep_time)
-    else:
-      print(f"Unexpected error encountered: {response.status}. Retrying...")
-  except: 
-    print(f"Unexpected error encountered: {response.status}. Retrying...")
-
-     
+    soup = BeautifulSoup(await response.text(), 'lxml')
+    counties_links = [county.find('a')['href'] for county in soup.find('ol', class_='counties').find_all('h3')]
+    return counties_links
 
 async def main():
-    BATCH_SIZE = 10  # Define your batch size
-
+    BATCH_SIZE = 5
     try:
-        async with ClientSession(trust_env=True) as session:
+        # connector = aiohttp.TCPConnector(force_close=True)
+        async with ClientSession() as session:
+            semaphore = asyncio.Semaphore(10)
             state_url = 'https://bustednewspaper.com/mugshots/ohio/'
             state = state_url.split('/')[-2]
             await send_telegram_message(f'Started {state}')
 
             print(state)
-            counties_links = await get_start_urls(session, state_url)
-            for county in counties_links:
+            counties_links = await get_start_urls(session, state_url, semaphore)
+            # print(counties_links[1:6])
+
+            for county in counties_links[2:3]:
                 start_url = county
                 county = start_url.split('/')[-2]
 
                 print(f"Currently scraping county: {county}")
 
-                last_page = await get_last_page(session, start_url)
+                last_page = await get_last_page(session, start_url, semaphore)
                 print("Last Page: ", last_page)
-                # last_page = 2
+                # last_page = 5
 
                 for page_num in range(1, last_page + 1, BATCH_SIZE):
                     batch_tasks = []
@@ -395,7 +293,20 @@ async def main():
                         url = f'{start_url}page/{batch_page_num}/'
                         print(f"Currently scraping page: {batch_page_num}")
                         try:
-                          response = await get_pages_with_retry(session, url)
+                          response = await fetch_with_retry(session, url, {
+                                        'User-Agent': ua.random,
+                                        'Accept': '*/*',
+                                        'Accept-Language': 'en-US,en;q=0.5',
+                                        'Accept-Encoding': 'gzip, deflate, br',
+                                        'Sec-Purpose': 'prefetch',
+                                        'Connection': 'keep-alive',
+                                        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+                                        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+                                        'Sec-Fetch-Dest': 'empty',
+                                        'Sec-Fetch-Mode': 'no-cors',
+                                        'Sec-Fetch-Site': 'same-origin',
+                                        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+                                    }, semaphore)
                           soup = BeautifulSoup(await response.text(), 'lxml')
 
                           listings_div = soup.find('div', class_='posts-list listing-alt')
@@ -404,7 +315,7 @@ async def main():
                               try:
                                   content = article.find('div', class_='content')
                                   link = content.find('a')['href']
-                                  batch_tasks.append(get_profile_details(session, link))
+                                  batch_tasks.append(get_profile_details(session, link, semaphore))
                               except:
                                   link = None
                         except:
@@ -415,10 +326,15 @@ async def main():
         print("Received KeyboardInterrupt. Stopping gracefully.")
         await send_telegram_message('Received KeyboardInterrupt. Stopping gracefully')
 
-    except Exception as e:
-        print("Error: ", e)
-        await send_telegram_message(f'Exception occurred from main(): {e}')
+    except (
+      aiohttp.ClientOSError,
+      aiohttp.ServerDisconnectedError) as e:
+      print("Error from main(), ClientOSError Or ServerDisconnectedError, retrying....", e)
+      await asyncio.sleep(3 + random.randint(0, 9))
 
+    except Exception as e:
+        print("Exception from main(): ", e)
+        await send_telegram_message(f'Exception occurred from main(): {e}')
     finally:
         global_df = pd.DataFrame(profile_list)
         output_file = f'profiles_{state}.csv'
@@ -428,5 +344,6 @@ async def main():
         await send_telegram_message('Saved file')
         profile_list.clear()
 
+#10mins to scrape 160 pages
 if __name__ == "__main__":
     asyncio.run(main())
