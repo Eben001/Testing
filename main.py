@@ -10,10 +10,9 @@ from aiohttp import ClientSession
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import os
 
-
-if asyncio.get_event_loop().is_running():
-    import nest_asyncio
-    nest_asyncio.apply()
+# if asyncio.get_event_loop().is_running():
+#     import nest_asyncio
+#     nest_asyncio.apply()
 
 USERNAME, PASSWORD = os.environ['username'], os.environ['password']
 
