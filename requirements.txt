@@ -1,0 +1,6 @@
+pandas
+aiohttp
+requests
+bs4
+urllib3
+asyncio
