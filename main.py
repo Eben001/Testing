@@ -331,40 +331,40 @@ async def get_start_urls(session, url):
     'Sec-Fetch-Mode': 'no-cors',
     'Sec-Fetch-Site': 'same-origin',
     'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"',
-
-}
-    try:
-      response = await session.get(url, proxy=proxies,headers=headers)
-      if response.status == 200:
-        soup = BeautifulSoup(await response.text(), 'lxml')
-        try:
-          ol = soup.find('ol', class_='counties')
-          all_counties = ol.find_all('h3')
-          for county in all_counties[0:1]: #0:26
-            county_link = county.find('a')['href']
-            # print(county_link)
-            counties_links.append(county_link)
   
-          return counties_links
-        except:
-          pass
-      elif str(response.status).startswith('4') and response.status != 404:
-        print(f"4xx error encountered: {response.status}. Retrying...")
-        #async with aiohttp.ClientSession() as new_session:
-          #session = new_session  # Replace the session with a new on
-        sleep_time = attempt * 2
-        print(f"Retrying in {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
-          #continue
-      elif str(response.status).startswith('5'):
-        print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
-        sleep_time = attempt * 2
-        print(f"Retrying in {sleep_time} seconds...")
-        await asyncio.sleep(sleep_time)
-      else:
-        print(f"Unexpected error encountered: {response.status}. Retrying...")
-   except: 
+  }
+  try:
+    response = await session.get(url, proxy=proxies,headers=headers)
+    if response.status == 200:
+      soup = BeautifulSoup(await response.text(), 'lxml')
+      try:
+        ol = soup.find('ol', class_='counties')
+        all_counties = ol.find_all('h3')
+        for county in all_counties[0:1]: #0:26
+          county_link = county.find('a')['href']
+          # print(county_link)
+          counties_links.append(county_link)
+  
+        return counties_links
+      except:
+        pass
+    elif str(response.status).startswith('4') and response.status != 404:
+      print(f"4xx error encountered: {response.status}. Retrying...")
+      #async with aiohttp.ClientSession() as new_session:
+        #session = new_session  # Replace the session with a new on
+      sleep_time = attempt * 2
+      print(f"Retrying in {sleep_time} seconds...")
+      await asyncio.sleep(sleep_time)
+        #continue
+    elif str(response.status).startswith('5'):
+      print(f"5xx error encountered: {response.status}. Retrying... Attempt {attempt+1}/{retry_attempts}")
+      sleep_time = attempt * 2
+      print(f"Retrying in {sleep_time} seconds...")
+      await asyncio.sleep(sleep_time)
+    else:
       print(f"Unexpected error encountered: {response.status}. Retrying...")
+  except: 
+    print(f"Unexpected error encountered: {response.status}. Retrying...")
 
      
 
