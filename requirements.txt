@@ -6,3 +6,4 @@ urllib3
 asyncio
 fake-useragent
 python-telegram-bot
+lxml
