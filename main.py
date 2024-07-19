@@ -21,7 +21,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 USERNAME, PASSWORD = os.environ['username'], os.environ['password']
 
 
-proxies = f'http://{USERNAME}:{PASSWORD}@unblock.oxylabs.io:60000'
+proxies = f'http://{USERNAME}:{PASSWORD}@rp.proxyscrape.com:6060'
 telegram_token = os.environ['telegram_token']
 telegram_chat_id = os.environ['telegram_chat_id']
 bot = Bot(token=telegram_token)
