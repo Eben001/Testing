@@ -340,7 +340,7 @@ async def get_start_urls(session, url):
       try:
         ol = soup.find('ol', class_='counties')
         all_counties = ol.find_all('h3')
-        for county in all_counties[0:1]: #0:26
+        for county in all_counties[0:20]: 
           county_link = county.find('a')['href']
           # print(county_link)
           counties_links.append(county_link)
@@ -386,8 +386,8 @@ async def main():
                 print(f"Currently scraping county: {county}")
 
                 last_page = await get_last_page(session, start_url)
-                # print("Last Page: ", last_page)
-                last_page = 2
+                print("Last Page: ", last_page)
+                # last_page = 2
 
                 for page_num in range(1, last_page + 1, BATCH_SIZE):
                     batch_tasks = []
