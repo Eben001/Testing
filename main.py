@@ -40,7 +40,6 @@ async def send_telegram_message(text):
 
 profile_list = []
 async def get_profile_details_with_retry(session, url):
-  #proxies = 'http://vk4ybm4f7ps5a54-odds-5+100:teys8oi11uhte8f@rp.proxyscrape.com:6060'
 
   retry_attempts = 20
   for attempt in range(retry_attempts):
@@ -216,7 +215,6 @@ async def get_profile_details(session, booking_url):
 
 async def get_last_page(session, url):
   # url = 'https://bustednewspaper.com/mugshots/florida/alachua-county/'
-  #proxies = 'http://vk4ybm4f7ps5a54-odds-5+100:teys8oi11uhte8f@rp.proxyscrape.com:6060'
  
   retry_attempts= 20
   for attempt in range(retry_attempts):
@@ -276,7 +274,6 @@ async def get_last_page(session, url):
 async def get_pages_with_retry(session, url):
   retry_attempts = 20
   for attempt in range(retry_attempts):
-    proxies = 'http://vk4ybm4f7ps5a54-odds-5+100:teys8oi11uhte8f@rp.proxyscrape.com:6060'
  
     headers = {
     'User-Agent': ua.random,
