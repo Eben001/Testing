@@ -7,28 +7,24 @@ import urllib3
 import asyncio
 import aiohttp
 from aiohttp import ClientSession
-import os
-import random
-from fake_useragent import UserAgent
 from telegram import Bot
-ua = UserAgent()
+import requests
+from fake_useragent import UserAgent
+import random
+import os
+import base64
 
+ua = UserAgent()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-# if asyncio.get_event_loop().is_running():
-#     import nest_asyncio
-#     nest_asyncio.apply()
-  
-USERNAME, PASSWORD = os.environ['username'], os.environ['password']
+if asyncio.get_event_loop().is_running():
+    import nest_asyncio
+    nest_asyncio.apply()
 
-
-proxies = f'http://{USERNAME}:{PASSWORD}@rp.proxyscrape.com:6060'
 telegram_token = os.environ['telegram_token']
 telegram_chat_id = os.environ['telegram_chat_id']
 bot = Bot(token=telegram_token)
-
-
 
 async def send_file_to_telegram(filename):
     with open(filename, 'rb') as file:
@@ -41,16 +37,34 @@ async def send_telegram_message(text):
 
 
 profile_list = []
-async def fetch_with_retry(session, url, headers, semaphore, max_retries=20):
+async def fetch_with_retry(session, url, semaphore, max_retries=20):
+    api_key = os.environ['api_key']
+    data = {
+        "url": url,
+        "httpResponseBody": True
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Api-Key': api_key
+    }
+
+
     retry_count = 0
     backoff_factor = 2
     while retry_count < max_retries:
         try:
             async with semaphore:
-                response = await session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=60),
-                                             proxy=proxies)
+                # response = await session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=60),proxy=proxies)
+                response = await session.post('https://api.proxyscrape.com/v3/accounts/freebies/scraperapi/request', headers=headers, json=data)
+            
+            
             if response.status == 200:
-                return response
+                json_response = await response.json()
+                if 'httpResponseBody' in json_response['data']:
+                    # Decode the base64-encoded HTML
+                    decoded_html = base64.b64decode(json_response['data']['httpResponseBody']).decode()
+                    return decoded_html
             elif response.status >= 400 and response.status < 500:
                 print(f"4xx error encountered: {response.status}. Retrying...")
             elif response.status >= 500:
@@ -68,25 +82,25 @@ async def fetch_with_retry(session, url, headers, semaphore, max_retries=20):
 
 
 async def get_profile_details(session, booking_url, semaphore):
-    headers = {
-        'User-Agent': ua.random,
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Purpose': 'prefetch',
-        'Connection': 'keep-alive',
-        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'no-cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
-    }
-    response = await fetch_with_retry(session, booking_url, headers, semaphore)
+    # headers = {
+    #     'User-Agent': ua.random,
+    #     'Accept': '*/*',
+    #     'Accept-Language': 'en-US,en;q=0.5',
+    #     'Accept-Encoding': 'gzip, deflate, br',
+    #     'Sec-Purpose': 'prefetch',
+    #     'Connection': 'keep-alive',
+    #     'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+    #     'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+    #     'Sec-Fetch-Dest': 'empty',
+    #     'Sec-Fetch-Mode': 'no-cors',
+    #     'Sec-Fetch-Site': 'same-origin',
+    #     'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+    # }
+    response = await fetch_with_retry(session, booking_url, semaphore)
     if response is None:
         return
 
-    soup = BeautifulSoup(await response.text(), 'lxml')
+    soup = BeautifulSoup(response, 'lxml')
     data = None
     name = None
     age = None
@@ -112,7 +126,10 @@ async def get_profile_details(session, booking_url, semaphore):
     try:
         name = soup.find('td', itemprop='name').get_text(strip=True)
     except:
-        pass
+        try:
+          name = soup.find('h1', class_='post-title item fn').text.strip()
+        except:
+          pass
 
     try:
         age = soup.find('th', string='age').find_next_sibling('td').get_text(strip=True)
@@ -137,17 +154,26 @@ async def get_profile_details(session, booking_url, semaphore):
     try:
         sex = soup.find('td', itemprop='gender').get_text(strip=True)
     except:
-        pass
+        try:
+          sex = soup.find('th', string='sex').find_next_sibling('td').get_text(strip=True)
+        except:
+          pass
 
     try:
         arrested_by = soup.find('th', string='arrested by').find_next_sibling('td').get_text(strip=True)
     except:
-        pass
+        try:
+          arrested_by = soup.find('th', string='arrested').find_next_sibling('td').get_text(strip=True)
+        except:
+          pass
 
     try:
         booked_date = soup.find('th', string='booked').find_next_sibling('td').get_text(strip=True)
     except:
-        pass
+        try:
+          booked_date = soup.find('time', class_='value-title').text
+        except:
+          pass
 
     try:
         county_url = soup.find('span', class_='cats').find('a')['href']
@@ -175,7 +201,17 @@ async def get_profile_details(session, booking_url, semaphore):
             charges_list.append(charge_desc)
         charges = ":::\n".join(charges_list)
     except:
-        pass
+        try:
+          charges_table = soup.find('h2', id='booking-charges-header').find_next('table')
+
+          charge_descriptions = [row.find('td').text for row in charges_table.find_all('tr')[1:]]
+
+          charges = ':::\n'.join(charge_descriptions)
+        except:
+          pass
+
+
+
 
     try:
         image_url = soup.find('meta', {"property": "og:image"})['content']
@@ -214,25 +250,25 @@ async def get_profile_details(session, booking_url, semaphore):
 
 
 async def get_last_page(session, url, semaphore):
-    headers = {
-        'User-Agent': ua.random,
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Purpose': 'prefetch',
-        'Connection': 'keep-alive',
-        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'no-cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
-    }
-    response = await fetch_with_retry(session, url, headers, semaphore)
+    # headers = {
+    #     'User-Agent': ua.random,
+    #     'Accept': '*/*',
+    #     'Accept-Language': 'en-US,en;q=0.5',
+    #     'Accept-Encoding': 'gzip, deflate, br',
+    #     'Sec-Purpose': 'prefetch',
+    #     'Connection': 'keep-alive',
+    #     'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+    #     'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+    #     'Sec-Fetch-Dest': 'empty',
+    #     'Sec-Fetch-Mode': 'no-cors',
+    #     'Sec-Fetch-Site': 'same-origin',
+    #     'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+    # }
+    response = await fetch_with_retry(session, url, semaphore)
     if not response:
         return
 
-    soup = BeautifulSoup(await response.text(), 'lxml')
+    soup = BeautifulSoup(response, 'lxml')
     max_page = 0
     for page in soup.find_all('a', class_='page-numbers'):
         page_num = int(re.search(r'page/(\d+)/', page['href']).group(1))
@@ -242,25 +278,25 @@ async def get_last_page(session, url, semaphore):
 
 
 async def get_start_urls(session, url, semaphore):
-    headers = {
-        'User-Agent': ua.random,
-        'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Purpose': 'prefetch',
-        'Connection': 'keep-alive',
-        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'no-cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
-    }
-    response = await fetch_with_retry(session, url, headers, semaphore)
+    # headers = {
+    #     'User-Agent': ua.random,
+    #     'Accept': '*/*',
+    #     'Accept-Language': 'en-US,en;q=0.5',
+    #     'Accept-Encoding': 'gzip, deflate, br',
+    #     'Sec-Purpose': 'prefetch',
+    #     'Connection': 'keep-alive',
+    #     'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+    #     'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+    #     'Sec-Fetch-Dest': 'empty',
+    #     'Sec-Fetch-Mode': 'no-cors',
+    #     'Sec-Fetch-Site': 'same-origin',
+    #     'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+    # }
+    response = await fetch_with_retry(session, url, semaphore)
     if not response:
         return []
 
-    soup = BeautifulSoup(await response.text(), 'lxml')
+    soup = BeautifulSoup(response, 'lxml')
     counties_links = [county.find('a')['href'] for county in soup.find('ol', class_='counties').find_all('h3')]
     return counties_links
 
@@ -272,56 +308,60 @@ async def main():
             semaphore = asyncio.Semaphore(10)
             state_url = 'https://bustednewspaper.com/mugshots/ohio/'
             state = state_url.split('/')[-2]
-            await send_telegram_message(f'Started {state}')
+            # await send_telegram_message(f'Started {state}')
 
             print(state)
             counties_links = await get_start_urls(session, state_url, semaphore)
             # print(counties_links[1:6])
 
-            for county in counties_links[2:3]:
-                start_url = county
-                county = start_url.split('/')[-2]
+            # for county in counties_links[3:4]:
 
-                print(f"Currently scraping county: {county}")
+            start_url = counties_links[30]
+            county = start_url.split('/')[-2]
 
-                last_page = await get_last_page(session, start_url, semaphore)
-                print("Last Page: ", last_page)
-                # last_page = 5
+            print(f"Currently scraping county: {county}")
 
-                for page_num in range(1, last_page + 1, BATCH_SIZE):
-                    batch_tasks = []
-                    for batch_page_num in range(page_num, min(page_num + BATCH_SIZE, last_page + 1)):
-                        url = f'{start_url}page/{batch_page_num}/'
-                        print(f"Currently scraping page: {batch_page_num}")
-                        try:
-                          response = await fetch_with_retry(session, url, {
-                                        'User-Agent': ua.random,
-                                        'Accept': '*/*',
-                                        'Accept-Language': 'en-US,en;q=0.5',
-                                        'Accept-Encoding': 'gzip, deflate, br',
-                                        'Sec-Purpose': 'prefetch',
-                                        'Connection': 'keep-alive',
-                                        'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
-                                        'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
-                                        'Sec-Fetch-Dest': 'empty',
-                                        'Sec-Fetch-Mode': 'no-cors',
-                                        'Sec-Fetch-Site': 'same-origin',
-                                        'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
-                                    }, semaphore)
-                          soup = BeautifulSoup(await response.text(), 'lxml')
+            last_page = await get_last_page(session, start_url, semaphore)
+            print("Last Page: ", last_page)
+            # last_page = 528
 
-                          listings_div = soup.find('div', class_='posts-list listing-alt')
-                          articles = listings_div.find_all('article')
-                          for article in articles:
-                              try:
-                                  content = article.find('div', class_='content')
-                                  link = content.find('a')['href']
-                                  batch_tasks.append(get_profile_details(session, link, semaphore))
-                              except:
-                                  link = None
-                        except:
-                          pass
-                    await asyncio.gather(*batch_tasks)
+            for page_num in range(4645, last_page + 1, BATCH_SIZE):
+                batch_tasks = []
+                for batch_page_num in range(page_num, min(page_num + BATCH_SIZE, last_page + 1)):
+                    url = f'{start_url}page/{batch_page_num}/'
+                    print(f"Currently scraping page: {batch_page_num} of {last_page} - {county}")
+                    try:
+                      response = await fetch_with_retry(
+                          session, url, 
+                          #  {
+                          #           'User-Agent': ua.random,
+                          #           'Accept': '*/*',
+                          #           'Accept-Language': 'en-US,en;q=0.5',
+                          #           'Accept-Encoding': 'gzip, deflate, br',
+                          #           'Sec-Purpose': 'prefetch',
+                          #           'Connection': 'keep-alive',
+                          #           'Referer': 'https://bustednewspaper.com/mugshots/ohio/adams-county/',
+                          #           'Cookie': 'usprivacy=1N--; _ga_PHJMBM9BQV=GS1.1.1721344369.6.1.1721344749.42.0.0; _ga=GA1.1.97208457.1721307241; _fbp=fb.1.1721307248354.736019126636307686',
+                          #           'Sec-Fetch-Dest': 'empty',
+                          #           'Sec-Fetch-Mode': 'no-cors',
+                          #           'Sec-Fetch-Site': 'same-origin',
+                          #           'If-None-Match': '"4f672d81cfc0faf51038eb00308474bc"'
+                          #       }, 
+                          semaphore)
+                      soup = BeautifulSoup(response, 'lxml')
+
+                      listings_div = soup.find('div', class_='posts-list listing-alt')
+                      articles = listings_div.find_all('article')
+                      for article in articles:
+                          try:
+                              content = article.find('div', class_='content')
+                              link = content.find('a')['href']
+                              batch_tasks.append(get_profile_details(session, link, semaphore))
+                          except:
+                              link = None
+                    except:
+                      pass
+                await asyncio.gather(*batch_tasks)
 
     except KeyboardInterrupt:
         print("Received KeyboardInterrupt. Stopping gracefully.")
@@ -338,13 +378,13 @@ async def main():
         await send_telegram_message(f'Exception occurred from main(): {e}')
     finally:
         global_df = pd.DataFrame(profile_list)
-        output_file = f'profiles_{state}.csv'
+        output_file = f'profiles_{state}_{county}.csv'
         global_df.to_csv(output_file, index=False)
         print(f"Data saved to {output_file}")
         await send_file_to_telegram(output_file)
-        await send_telegram_message('Saved file')
+        await send_telegram_message(f'Done for county: {county}')
         profile_list.clear()
 
-#10mins to scrape 160 pages
+
 if __name__ == "__main__":
     asyncio.run(main())
