@@ -17,11 +17,6 @@ import base64
 ua = UserAgent()
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-
-if asyncio.get_event_loop().is_running():
-    import nest_asyncio
-    nest_asyncio.apply()
-
 telegram_token = os.environ['telegram_token']
 telegram_chat_id = os.environ['telegram_chat_id']
 bot = Bot(token=telegram_token)
@@ -323,9 +318,9 @@ async def main():
 
             last_page = await get_last_page(session, start_url, semaphore)
             print("Last Page: ", last_page)
-            # last_page = 528
+            last_page = 2
 
-            for page_num in range(4645, last_page + 1, BATCH_SIZE):
+            for page_num in range(1, last_page + 1, BATCH_SIZE):
                 batch_tasks = []
                 for batch_page_num in range(page_num, min(page_num + BATCH_SIZE, last_page + 1)):
                     url = f'{start_url}page/{batch_page_num}/'
