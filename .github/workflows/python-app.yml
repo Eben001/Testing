@@ -4,8 +4,7 @@ on:
   workflow_dispatch:
 
 env: 
-  username: ${{ secrets.USERNAME }}
-  password: ${{ secrets.PASSWORD }}
+  api_key: ${{ secrets.API_KEY }}
   telegram_token: ${{ secrets.TELEGRAM_TOKEN }}
   telegram_chat_id: ${{ secrets.TELEGRAM_CHAT_ID }}
 
